@@ -1,6 +1,8 @@
 <?php
 define("ATK14_USE_SMARTY3", true);
+define("ATK14_DOCUMENT_ROOT", __DIR__ );
 require_once('../../../../load.php');
+
 class TcSmarty3Render extends TcBase{
 
 	function test() {
