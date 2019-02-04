@@ -1,25 +1,24 @@
 <?php
 define("ATK14_USE_SMARTY3", true);
-require_once('../load.php');
+require_once('../../../../load.php');
 class TcSmarty3Render extends TcBase{
 
 	function test() {
-			$smarty = Atk14Utils::GetSmarty([__DIR__]);
-			$this->array = [ 'keyboard' => 7, 3 => 'chicken' ];
-			$smarty->assign(
-				['a' => 1,
-				'e' => 1,
-				'f' => 1,
-				'test' => $this,
-				'array' => $this->array
-			 ]);
-			$this->counter=0;
-			end($this->array);
-			next($this->array);
-			$smarty->fetch('tc_smarty_render.tpl');
-			$this->assertEquals($this->counter, 6);
+		$smarty = Atk14Utils::GetSmarty(array(__DIR__."/templates/"));
+		$this->array = array('keyboard' => 7, 3 => 'chicken');
+		$smarty->assign(array(
+			'a' => 1,
+			'e' => 1,
+			'f' => 1,
+			'test' => $this,
+			'array' => $this->array
+		));
+		$this->counter=0;
+		end($this->array);
+		next($this->array);
+		$smarty->fetch('tc_smarty_render.tpl');
+		$this->assertEquals($this->counter, 6);
 	}
-
 }
 
 function smarty_function_assert($params, $template) {
