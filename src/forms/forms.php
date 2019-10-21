@@ -81,71 +81,22 @@ class JsFormValidator{
 }
 
 /**
- * Converts 'first_name' to 'First name'.
- *
- * @param string $name
- * @return string
- */
-function pretty_name($name)
-{
-	return str_replace('_', ' ', ucfirst($name));
-}
-
-/**
- * Escapes html.
- */
-function forms_htmlspecialchars($string)
-{
-	return h($string, ENT_COMPAT);
-
-	// puvodne tady byla tato verze.
-	// to ale zlobilo na webech, ktere nebezi v UTF-8...
-	//return htmlspecialchars($string, ENT_COMPAT, 'UTF-8');
-}
-
-/**
- * A smarter replacement for PHP built-in array_merge().
- *
- * In PHP5 array_merge() changes its behaviour and accepts strictly arrays.
- */
-function forms_array_merge ()
-{
-	$merged=array ();
-	for($i=0;$i<func_num_args ();$i++)
-	{
-		$val = func_get_arg($i);
-		if(!isset($val)){ continue; }
-		$tmp= is_array($val) ?  $val : array($val);
-		$merged=array_merge ($merged,$tmp);
-	}
-	return $merged;
-}
-
-/**
-* Funkce pro prevod pole s error hlaskami na HTML strukturu
-* vhodnou k zobrazeni v sablonach.
-*/
-function format_errors($errors)
-{
-	if (count($errors) < 1) {
-		return '';
-	}
-	$output = array();
-	foreach ($errors as $e) {
-		$output[] = '<li>'.$e.'</li>';
-	}
-	return '<ul class="errorlist">'.implode('', $output).'</ul>';
-}
-
-
-/**
  * Bound field je trida pro formularove pole (field), do ktereho jsou nalite data.
  *
  * @package Atk14
  * @subpackage InternalLibraries
  */
-class BoundField
-{
+class BoundField {
+	/**
+	 * @var Field
+	 */
+	var $field;
+
+	/**
+	 * @var Widget
+	 */
+	var $widget;
+
 	function __construct($form, $field, $name)
 	{
 		$this->form = $form;
@@ -162,7 +113,6 @@ class BoundField
 		$this->help_text = $field->help_text;
 		$this->hint = $field->hint;
 		$this->hints = $field->hints;
-		$this->hint_in_placeholder = $field->hint_in_placeholder;
 		$this->required = $this->field->required;
 		$this->disabled = $this->field->disabled;
 	}
@@ -249,7 +199,7 @@ class BoundField
 	function as_textarea($attrs=null)
 	{
 		return $this->as_widget(array(
-			'widget' => new Textarea(),
+			'widget' => new TextArea(),
 			'attrs' => $attrs
 		));
 	}
@@ -339,12 +289,13 @@ class BoundField
 	}
 
 	/**
-	* Pokud ma formular definovan parametr auto_id, vrati tato metoda
-	* vypocitany atribut ID pro formularove pole.
-	* NOTE: tohle je Djangu property
-	*/
-	function auto_id()
-	{
+	 * Pokud ma formular definovan parametr auto_id, vrati tato metoda
+	 * vypocitany atribut ID pro formularove pole.
+	 * NOTE: tohle je Djangu property
+	 *
+	 * @return string
+	 */
+	function auto_id() {
 		$auto_id = $this->form->auto_id;
 		if (strpos($auto_id, '%s') !== false) {
 			return str_replace('%s', $this->html_name, $auto_id);
@@ -362,15 +313,22 @@ class BoundField
 	 */
 	function get_initial()
 	{
-	   if(isset($this->form->initial[$this->name])){ return $this->form->initial[$this->name]; }
-	   if(isset($this->field->initial)){ return $this->field->initial; }
-	   return null;
+		if(isset($this->form->initial[$this->name])){ return $this->form->initial[$this->name]; }
+		if(isset($this->field->initial)){ return $this->field->initial; }
+		return null;
 	}
 
 	/**
 	 * Magic method for conversion to string
 	 *
-	 * echo "$field"; // <input type="text" name="company" id="id_company" />
+	 * ```
+	 * echo "$field";
+	 * ```
+	 * should render
+	 * ```
+	 * <input type="text" name="company" id="id_company" />
+	 * ```
+	 * @return string
 	 */
 	function __toString(){
 		return $this->as_widget();
@@ -383,6 +341,7 @@ class BoundField
  *
  * You should use the class {@link Atk14Form} instead of this class in an application.
  *
+ * @todo Write about creating and using forms
  * @package Atk14
  * @subpackage Forms
  */
@@ -401,6 +360,9 @@ class Form implements ArrayAccess
 	private $label_suffix = "";
 
 	/**
+	 * Format of attribute 'id' used by inputs nested in a form.
+	 *
+	 * @see Form::__construct()
 	 * @var string
 	 * @access private
 	 * @todo make the attribute private and fix tests
@@ -426,7 +388,7 @@ class Form implements ArrayAccess
 	/**
 	 * Cleaned data.
 	 *
-	 * Submitted data processed by {@link Field::clean()} method. The entry must be valid to appear in $cleaned_data.
+	 * Array with submitted data. Each element contains value processed by {@link Field::clean()} method. The entry must be valid to appear in $cleaned_data.
 	 *
 	 * @var array
 	 */
@@ -456,6 +418,18 @@ class Form implements ArrayAccess
 	 */
 	var $errors = null;
 
+	/**
+	 *
+	 * @param array $options
+	 * - prefix [default null]
+	 * - label_suffix [default ':']
+	 * - auto_id affects generation of 'id' attribute of nested inputs [default: 'id_%s']
+	 * 	- false - inputs will not have 'id' attribute. Nor label attributes will be generated.
+	 * 	- true - attribute id will be generated and it will equal to the name attribute
+	 * 	- string
+	 * 		- in case of common string it will be evaluated as true and the id attribute will be generated as in that case
+	 * 		- when the string contains '%s' the resulting name will be generated by replacing the '%s' by the name of the input field
+	 */
 	function __construct($options=array())
 	{
 		$options = forms_array_merge(
@@ -531,10 +505,13 @@ class Form implements ArrayAccess
 	}
 
 	/**
-	* Pokud je potreba nastavit prefix jindy nez v kontstruktoru....
-	*/
-	function set_prefix($prefix)
-	{
+	 * Set prefix for forms input names.
+	 *
+	 * This method is intended for using when it can not be set in constructor
+	 *
+	 * @param string $prefix
+	 */
+	function set_prefix($prefix) {
 		$this->prefix = $prefix;
 	}
 
@@ -575,7 +552,7 @@ class Form implements ArrayAccess
 	 *
 	 * @return array
 	 *
-	 * {@internal NOTE: Michaluv vymysl}
+	 * @internal NOTE: Michaluv vymysl
 	 */
 	function get_field_keys()
 	{
@@ -649,24 +626,29 @@ class Form implements ArrayAccess
 	 *
 	 * Returns true when there is an error on specified field.
 	 *
-	 * 	if($form->error_on("email")){
-	 * 		 echo "mate chybu na policku E-mail";
-	 * 	}
+	 * ```
+	 * if($form->error_on("email")){
+	 * 	 echo "mate chybu na policku E-mail";
+	 * }
+	 * ```
 	 *
 	 * @param string $name
 	 * @return bool true if there is an error on specified field.
 	 */
-	function error_on($field_name)
-	{
+	function error_on($field_name) {
 		$errors = $this->get_errors();
 		return ($this->is_bound && isset($errors[$field_name]) && sizeof($errors[$field_name])>0);
 	}
 
 	/**
-	* Vrati jmeno policka a prefixem, pokud ma formular parametr $prefix nastaven.
-	*/
-	function add_prefix($field_name)
-	{
+	 * Returns name of a field including prefix when it is set.
+	 *
+	 * Prefix can be set by {@link Form::set_prefix()}
+	 *
+	 * @param string $field_name
+	 * @return string
+	 */
+	function add_prefix($field_name) {
 		if ($this->prefix) {
 			return $this->prefix.'_'.$field_name;
 		}
@@ -680,10 +662,12 @@ class Form implements ArrayAccess
 	 *
 	 * Sets $disabled flag of specified fields.
 	 *
-	 * 	$form->disable_fields(array(
-	 * 		"firstname",
-	 * 		"lastname"
-	 * 	));
+	 * ```
+	 * $form->disable_fields(array(
+	 * 	"firstname",
+	 * 	"lastname"
+	 * ));
+	 * ```
 	 *
 	 * @param array $names
 	 */
