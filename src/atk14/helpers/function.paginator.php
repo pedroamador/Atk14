@@ -84,10 +84,25 @@ function smarty_function_paginator($params,$template){
 	foreach(array("action","controller","lang","namespace") as $_k){
 		if(isset($params[$_k])){ $par[$_k] = $params["action"]; }
 	}
-
 	
 	$from = isset($par["$from_name"]) ? (int)$par["$from_name"] : 0;
 	if($from<0){ $from = 0;}
+
+	$symbol_left = "&larr;";
+	$symbol_right = "&rarr;";
+	$label_left = _("Prev");
+	$label_right = _("Next");
+	if(USING_FONTAWESOME){
+		// Here we should be pretty sure that icons works, so the labels can be hidden.
+		$symbol_left = '<i class="fas fa-chevron-left" title="%s"></i>';
+		$symbol_right = '<i class="fas fa-chevron-right"></i>';
+		$label_left = "<span class=\"sr-only\">$label_left</span>";
+		$label_right = "<span class=\"sr-only\">$label_right</span>";
+	}elseif(!USING_BOOTSTRAP4){
+		// Perhaps Bootstrap 3, but who knows... Rather to not hide labels.
+		$symbol_left = '<i class="glyphicon glyphicon-chevron-left"></i>';
+		$symbol_right = '<i class="glyphicon glyphicon-chevron-right"></i>';
+	}
 
 	$out = array();
 
@@ -108,7 +123,7 @@ function smarty_function_paginator($params,$template){
 	if($from>0){
 		$par["$from_name"] = $from - $max_amount;
 		$url = _smarty_function_paginator_build_url($par,$smarty,$from_name);
-		$out[] = "<li class=\"page-item first-child prev\"><a class=\"page-link\" href=\"$url\"><i class=\"fas fa-arrow-left\"></i> "._("Prev")."</a></li>";
+		$out[] = "<li class=\"page-item first-child prev\"><a class=\"page-link\" href=\"$url\" rel=\"nofollow\">$symbol_left $label_left</span></a></li>";
 		$first_child = false;
 	}
 
@@ -130,9 +145,9 @@ function smarty_function_paginator($params,$template){
 		$_class = $_class ? " class=\"".join(" ",$_class)."\"" : "";
 
 		if($cur_from==$from){
-			$out[] = "<li$_class><a class=\"page-link\" href=\"$url\">$screen</a></li>";
+			$out[] = "<li$_class><a class=\"page-link\" href=\"$url\" rel=\"nofollow\">$screen</a></li>";
 		}else{
-			$out[] = "<li$_class><a class=\"page-link\" href=\"$url\">$screen</a></li>";
+			$out[] = "<li$_class><a class=\"page-link\" href=\"$url\" rel=\"nofollow\">$screen</a></li>";
 		}
 		$screen++;
 		
@@ -153,7 +168,7 @@ function smarty_function_paginator($params,$template){
 	if(($from+$max_amount)<$total_amount){
 		$par["$from_name"] = $from + $max_amount;
 		$url = _smarty_function_paginator_build_url($par,$smarty,$from_name);
-		$out[] = "<li class=\"page-item last-child next\"><a class=\"page-link\" href=\"$url\">"._("Next")." <i class=\"fas fa-arrow-right\"></i></a></li>";
+		$out[] = "<li class=\"page-item last-child next\"><a class=\"page-link\" href=\"$url\" rel=\"nofollow\">$label_right $symbol_right</a></li>";
 	}
 
 	$out[] = "</ul>";
