@@ -60,6 +60,7 @@ class Atk14DeploymentStage{
 			"user" => null,
 			"server" => null,
 			"port" => null, // ssh port, e.g. "2222"
+			"env" => "", // e.g. "PATH=/home/john/bin/:$PATH EDITOR=vim"; environment variable ATK14_ENV=production is set automatically
 			"directory" => null,
 			"create_maintenance_file" => "false",
 			"deploy_via" => "git_push", // there is only one way
@@ -128,19 +129,34 @@ class Atk14DeploymentStage{
 		}
 
 		$replaces['{{name}}'] = $name;
-		
-		foreach($ar as $key => $value){
-			$ar[$key] = self::_ReplaceVariablesInItem($value,$replaces);
+
+		$cnt = 0;
+		while(1){
+			$something_replaced = false;
+			foreach($ar as $key => $value){
+				$ar[$key] = self::_ReplaceVariablesInItem($value,$replaces,$_something_replaced);
+				$something_replaced = $_something_replaced ? $_something_replaced : $something_replaced;
+			}
+			if(!$something_replaced){ break; }
+			//
+			$cnt++;
+			if($cnt>10){
+				throw new Exception("A circular reference found in deploy.yml in stage $name");
+			}
 		}
 
 		return $ar;
 	}
 
-	protected static function _ReplaceVariablesInItem($item,$replaces){
+	protected static function _ReplaceVariablesInItem($item,$replaces,&$something_replaced = false){
+		$something_replaced = false;
+	
 		if(is_null($item)){ return $item; }
 		if(is_array($item)){
 			foreach($item as $k => $v){
-				$item[$k] = self::_ReplaceVariablesInItem($v,$replaces);
+				$_something_replaced = false;
+				$item[$k] = self::_ReplaceVariablesInItem($v,$replaces,$_something_replaced);
+				$something_replaced = $_something_replaced ? $_something_replaced : $something_replaced;
 			}
 			return $item;
 		}
@@ -148,7 +164,9 @@ class Atk14DeploymentStage{
 		// normalizing variable names
 		$item = preg_replace('/\{\{ ?([a-z_]+) ?\}\}/','{{\1}}',$item); // {{ user }} -> {{user}}
 
+		$orig = "$item";
 		$item = strtr($item,$replaces);
+		$something_replaced = $item!==$orig;
 		return $item;
 	}
 
