@@ -6,6 +6,14 @@
 
 $__CONFIG_CONSTANTS__ = array();
 
+// Constants  for the environment determination.
+// Just one of these should be true.
+__defaults__(array(
+	"PRODUCTION" => false,
+	"DEVELOPMENT" => false,
+	"TEST" => false,
+));
+
 // Make sure you have strong secret phrase in SECRET_TOKEN constant in PRODUCTION.
 // Place the secret phrase into file config/.secret_token.txt
 if(!defined("SECRET_TOKEN")){
@@ -75,6 +83,28 @@ __defaults__(array(
 	"ATK14_SSL_PORT" => 443,
 ));
 
+__defaults__(array(
+	"REDIRECT_TO_SSL_AUTOMATICALLY" => false,
+));
+
+__defaults__(array(
+	// This buils something like "http://atk14skelet.localhost/" or "https://www.example.com:444/"
+	"ATK14_APPLICATION_URL" =>
+		"http".
+		(REDIRECT_TO_SSL_AUTOMATICALLY ? "s" : "").
+		"://".
+		(REDIRECT_TO_SSL_AUTOMATICALLY ? ATK14_HTTP_HOST_SSL : ATK14_HTTP_HOST).
+		(REDIRECT_TO_SSL_AUTOMATICALLY && ATK14_SSL_PORT!=443 ? ":".ATK14_SSL_PORT : "").
+		(!REDIRECT_TO_SSL_AUTOMATICALLY && ATK14_NON_SSL_PORT!=80 ? ":".ATK14_NON_SSL_PORT : "").
+		ATK14_BASE_HREF
+));
+
+__defaults__(array(
+ 	// Default file and dir permissions for class Files
+	"FILES_DEFAULT_FILE_PERMS" => 0666,
+	"FILES_DEFAULT_DIR_PERMS" => 0777,
+));
+
 // SessionStorer`s constants, a session subsystem
 __defaults__(array(
 	"SESSION_STORER_SESSION_MAX_LIFETIME" => 60 * 60 * 24 * 1, // time in seconds; whole day by default
@@ -86,7 +116,11 @@ __defaults__(array(
 ));
 
 __defaults__(array(
-	"LOGGER_DEFAULT_LOG_FILE" => __realpath__( TEST ? __DIR__."/../log/test.log" : __DIR__."/../log/application.log" ),
+	"LOG_DIR" => __realpath__(__DIR__."/../log")."/",
+));
+
+__defaults__(array(
+	"LOGGER_DEFAULT_LOG_FILE" => __realpath__( TEST ? LOG_DIR."/test.log" : LOG_DIR."/application.log" ),
 	"LOGGER_DEFAULT_NOTIFY_EMAIL" => ATK14_ADMIN_EMAIL,
 	"LOGGER_MIN_LEVEL_FOR_EMAIL_NOTIFICATION" => PRODUCTION ? 4 : 30, // 4 -> error, we don't want to receive emails with something less important than error
 	"LOGGER_NO_LOG_LEVEL" => PRODUCTION ? -1 : -30, // -1 -> debug, we don't want to log debug messages on PRODUCTION

@@ -351,6 +351,64 @@ class tc_dbmole extends tc_base{
 		unlink($sending_lock_file);
 	}
 
+	function test_getDatabaseVersion(){
+		foreach(array($this->pg,$this->my) as $dbmole){
+
+			// Server version
+
+			$server_version_str = $dbmole->getDatabaseServerVersion();
+			$this->assertTrue(is_string($server_version_str));
+			$this->assertTrue(strlen($server_version_str)>0);
+			$this->assertTrue(!!preg_match('/^\d+\.\d+/',$server_version_str));
+
+			$server_version_ary = $dbmole->getDatabaseServerVersion(array("as_array" => true));
+			$this->assertTrue(is_array($server_version_ary));
+			$this->assertTrue(is_int($server_version_ary["major"]));
+			$this->assertTrue($server_version_ary["major"]>0);
+			$this->assertTrue(is_int($server_version_ary["minor"]));
+			$this->assertTrue(is_int($server_version_ary["patch"]));
+			$this->assertEquals($server_version_str,"$server_version_ary[major].$server_version_ary[minor].$server_version_ary[patch]");
+
+			$server_version_float = $dbmole->getDatabaseServerVersion(array("as_float" => true));
+			$this->assertTrue(is_float($server_version_float));
+			$this->assertEquals((float)(sprintf("%s.%02d%03d",$server_version_ary["major"],$server_version_ary["minor"],$server_version_ary["patch"])),$server_version_float);
+
+			$this->assertEquals($server_version_ary,$dbmole->getDatabaseServerVersion("as_array"));
+			$this->assertEquals($server_version_float,$dbmole->getDatabaseServerVersion("as_float"));
+
+			// Client version
+
+			$client_version_str = $dbmole->getDatabaseClientVersion();
+			$this->assertTrue(is_string($client_version_str));
+			$this->assertTrue(strlen($client_version_str)>0);
+			$this->assertTrue(!!preg_match('/^\d+\.\d+/',$client_version_str));
+
+			$client_version_ary = $dbmole->getDatabaseClientVersion(array("as_array" => true));
+			$this->assertTrue(is_array($client_version_ary));
+			$this->assertTrue(is_int($client_version_ary["major"]));
+			$this->assertTrue($client_version_ary["major"]>0);
+			$this->assertTrue(is_int($client_version_ary["minor"]));
+			$this->assertTrue(is_int($client_version_ary["patch"]));
+			$this->assertEquals($client_version_str,"$client_version_ary[major].$client_version_ary[minor].$client_version_ary[patch]");
+
+			$client_version_float = $dbmole->getDatabaseClientVersion(array("as_float" => true));
+			$this->assertTrue(is_float($client_version_float));
+			$this->assertEquals((float)(sprintf("%s.%02d%03d",$client_version_ary["major"],$client_version_ary["minor"],$client_version_ary["patch"])),$client_version_float);
+
+			$this->assertEquals($client_version_ary,$dbmole->getDatabaseClientVersion("as_array"));
+			$this->assertEquals($client_version_float,$dbmole->getDatabaseClientVersion("as_float"));
+		}
+	}
+
+	function test__parseVersion(){
+		$dbmole = new ProxyDbMole();
+		$this->assertEquals(array("major" => 9, "minor" => 6, "patch" => 16),$dbmole->parseVersion("9.6.16",array("as_array" => true)));
+		$this->assertEquals(array("major" => 9, "minor" => 6, "patch" => 0),$dbmole->parseVersion("9.6",array("as_array" => true)));
+
+		$this->assertEquals(9.06016,$dbmole->parseVersion("9.6.16",array("as_float" => true)));
+		$this->assertEquals(9.616,$dbmole->parseVersion("9.6.16",array("as_float" => true,"minor_number_divider" => 10, "patch_number_divider" => 1000)));
+	}
+
 	function _test_common_behaviour(&$dbmole){
 		$this->assertTrue($dbmole->doQuery("DELETE FROM test_table"));
 
@@ -462,6 +520,24 @@ class tc_dbmole extends tc_base{
 		$this->assertEquals(array(),$ar);
 
 		$ar = $dbmole->selectIntoArray("SELECT an_integer FROM test_table WHERE an_integer=-an_integer");
+		$this->assertEquals(array(),$ar);
+
+		$ar = $dbmole->selectIntoArray("SELECT an_integer FROM test_table ORDER BY an_integer",array(),array("limit" => 3, "offset" => 0));
+		$this->assertEquals(array("11","22","33"),$ar);
+
+		$ar = $dbmole->selectIntoArray("SELECT an_integer FROM test_table ORDER BY an_integer",array(),array("limit" => 0, "offset" => 0));
+		$this->assertEquals(array(),$ar);
+
+		$ar = $dbmole->selectIntoArray("SELECT an_integer FROM test_table ORDER BY an_integer",array(),array("limit" => 3, "offset" => -1));
+		$this->assertEquals(array("11","22"),$ar);
+
+		$ar = $dbmole->selectIntoArray("SELECT an_integer FROM test_table ORDER BY an_integer",array(),array("limit" => 3, "offset" => -2));
+		$this->assertEquals(array("11"),$ar);
+
+		$ar = $dbmole->selectIntoArray("SELECT an_integer FROM test_table ORDER BY an_integer",array(),array("limit" => 3, "offset" => -3));
+		$this->assertEquals(array(),$ar);
+
+		$ar = $dbmole->selectIntoArray("SELECT an_integer FROM test_table ORDER BY an_integer",array(),array("limit" => -10, "offset" => -10));
 		$this->assertEquals(array(),$ar);
 
 		$ar = $dbmole->selectIntoAssociativeArray("SELECT an_integer,an_integer+1 FROM test_table ORDER BY an_integer",array());

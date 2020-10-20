@@ -94,6 +94,10 @@ class Atk14DeploymentStage{
 
 			$ar = self::_ReplaceVariables($ar,$name);
 
+			if(strlen($ar["deploy_repository"]) && strpos($ar["deploy_repository"],":")===false && strlen($ar["server"])){
+				$ar["deploy_repository"] = (strlen($ar["user"]) ? "$ar[user]@" : "")."$ar[server]:$ar[deploy_repository]"; // "/home/user/repos/myapp.git" -> "user@server:/home/user/repos/myapp.git"
+			}
+
 			/*
 			// TODO: add some checks
 			$raw_def_keys = array_keys($raw_def);
@@ -119,6 +123,113 @@ class Atk14DeploymentStage{
 		}
 
 		return $out;
+	}
+
+	function getName(){
+		return $this->name;
+	}
+
+	function getDirectory(){
+		return $this->directory;
+	}
+
+	/**
+	 * Returns URL of the deploy repository from the outside view
+	 *
+	 */
+	function getDeployRepository(){
+		$ar = $this->toArray();
+		if(strlen($ar["deploy_repository"]) && strpos($ar["deploy_repository"],":")===false && strlen($ar["server"])){
+			$ar["deploy_repository"] = (strlen($ar["user"]) ? "$ar[user]@" : "")."$ar[server]:$ar[deploy_repository]"; // "/home/user/repos/myapp.git" -> "user@server:/home/user/repos/myapp.git"
+		}
+		return $ar["deploy_repository"];
+	}
+
+	/**
+	 * Returns URL of the deploy repository from the views of the deployment server
+	 *
+	 */
+	function getDeployRepositoryRemoteDir(){
+		$ar = $this->toArray();
+		$deploy_repository_remote = $ar["deploy_repository"];
+		$deploy_repository_remote = preg_replace('/^.*?:/','',$deploy_repository_remote);
+		if(!preg_match('/^\//',$deploy_repository_remote)){ $deploy_repository_remote = "/home/$ar[user]/$deploy_repository_remote"; }
+		return $deploy_repository_remote;
+	}
+
+	/**
+	 *
+	 * @return string[]
+	 */
+	function getRsync(){
+		$out = $this->rsync;
+		if(!$out){ return array(); }
+		if(!is_array($out)){
+			$out = array($out);
+		}
+		return $out;
+	}
+
+	/**
+	 *
+	 * 	$cmd = $stage->compileRemoteShellCommand("./scripts/migrate"); // e.g. 'ssh deploy@devel.mushoomradar.net "cd /home/deploy/webapps/mushoomradar_devel/ && export ATK14_ENV=production && (./scripts/migrate)"'
+	 */
+	function compileRemoteShellCommand($cmd,$cd_to_project_directory = true){
+		$config = $this->toArray();
+
+		$cd_cmd = $cd_to_project_directory ? "cd $config[directory] && " : ""; // e.g. "cd /home/deploy/webapps/myapp/ && "
+
+		$port_spec = $config["port"] ? " -p $config[port]" : "";
+		$user = $config["user"] ? "$config[user]@" : "";
+		$env = "ATK14_ENV=production";
+		$env .= $config["env"] ? " $config[env]" : "";
+		$cmd = "ssh $user$config[server]$port_spec \"${cd_cmd}export $env && (".strtr($cmd,array('"' => '\"', "\\" => "\\\\")).")\"";
+		return $cmd;
+	}
+
+	/**
+	 *
+	 *	$cmd = $stage->compileRsyncCommand("public/dist/");
+	 */
+	function compileRsyncCommand($file){
+		$config = $this->toArray();
+		if(is_dir(ATK14_DOCUMENT_ROOT."/".$file)){
+			!preg_match('/\/$/',$file) && ($file .= "/"); // "public/dist" -> "public/dist/"
+		}
+		$port_spec = $config["port"] ? " -e 'ssh -p $config[port]'" : "";
+		$user = $config["user"] ? "$config[user]@" : "";
+		$dest = "$config[directory]/$file";
+		$dest = preg_replace('/\/{2,}/','/',$dest);
+		return "rsync -av --checksum --no-times --delete$port_spec $file $user$config[server]:$dest";
+	}
+
+	function toArray(){
+		// it's fine to have the name on the first position :)
+		$data = $this->data->toArray();
+		$out = array("name" => $data["name"]);
+		unset($data["name"]);
+		return $out + $data;
+	}
+
+	/**
+	 * Get instance of Atk14DeploymentStage by name
+	 *
+	 * ```
+	 * $preview = Atk14DeploymentStage::GetStage("preview"):
+	 * ```
+	 *
+	 * @param $name string
+	 * @return Atk14DeploymentStage
+	 * @todo maybe should return null when no stage is found
+	 */
+	static function GetStage($name){
+		foreach(Atk14DeploymentStage::GetStages() as $s){
+			if($s->name==$name){ return $s; }
+		}
+	}
+
+	static function GetFirstStage(){
+		foreach(Atk14DeploymentStage::GetStages() as $s){ return $s; }
 	}
 
 	protected static function _ReplaceVariables($ar,$name){
@@ -168,35 +279,6 @@ class Atk14DeploymentStage{
 		$item = strtr($item,$replaces);
 		$something_replaced = $item!==$orig;
 		return $item;
-	}
-
-	/**
-	 * Get instance of Atk14DeploymentStage by name
-	 *
-	 * ```
-	 * $preview = Atk14DeploymentStage::GetStage("preview"):
-	 * ```
-	 *
-	 * @param $name string
-	 * @return Atk14DeploymentStage
-	 * @todo maybe should return null when no stage is found
-	 */
-	static function GetStage($name){
-		foreach(Atk14DeploymentStage::GetStages() as $s){
-			if($s->name==$name){ return $s; }
-		}
-	}
-
-	static function GetFirstStage(){
-		foreach(Atk14DeploymentStage::GetStages() as $s){ return $s; }
-	}
-
-	function toArray(){
-		// it's fine to have the name on the first position :)
-		$data = $this->data->toArray();
-		$out = array("name" => $data["name"]);
-		unset($data["name"]);
-		return $out + $data;
 	}
 
 	function __toString(){
